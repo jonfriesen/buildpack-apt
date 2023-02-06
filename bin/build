@@ -10,6 +10,13 @@ start_time=$(date +%s%N)
 # debug
 set -x
 
+
+echo "$PWD"
+ls -lah
+echo "dirname ${BASH_SOURCE[0]}"
+echo "$(dirname "${BASH_SOURCE[0]}")/util.sh"
+exit 0
+
 # shellcheck disable=SC1090,SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/util.sh"
 
