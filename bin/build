@@ -8,14 +8,9 @@ set -eu
 start_time=$(date +%s%N)
 
 # debug
-set -x
-
-
-echo "$PWD"
-ls -lah
-echo "dirname ${BASH_SOURCE[0]}"
-echo "$(dirname "${BASH_SOURCE[0]}")/util.sh"
-exit 0
+if [[ -v BUILDPACK_APT_DEBUG ]]; then
+  set -x
+fi
 
 # shellcheck disable=SC1090,SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/util.sh"
@@ -113,43 +108,43 @@ else
 	mkdir -p "$apt_env_dir"
 
 	path="$apt_layer/usr/bin"
-	echo "PATH=$path" | indent
+	log::info "PATH=$path" | indent
 	echo "export PATH=\"$path:\$PATH\"" >> "$exports_path"
 	echo -n "$path:$PATH" > "$apt_env_dir"/PATH.prepend
 	echo -n ":" > "$apt_env_dir"/PATH.delim
 
 	ld_library_path=$apt_layer/lib/x86_64-linux-gnu:$apt_layer/lib/i386-linux-gnu:$apt_layer/lib:$apt_layer/usr/lib/x86_64-linux-gnu:$apt_layer/usr/lib/i386-linux-gnu:$apt_layer/usr/lib
-	echo "LD_LIBRARY_PATH=$ld_library_path" | indent
+	log::info "LD_LIBRARY_PATH=$ld_library_path" | indent
 	echo "export LD_LIBRARY_PATH=\"$ld_library_path:\$LD_LIBRARY_PATH\"" >> "$exports_path"
 	echo -n "$ld_library_path" > "$apt_env_dir"/LD_LIBRARY_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/LD_LIBRARY_PATH.delim
 
 	library_path=$ld_library_path
-	echo "LIBRARY_PATH=$library_path" | indent
+	log::info "LIBRARY_PATH=$library_path" | indent
 	echo "export LIBRARY_PATH=\"$library_path:\$LIBRARY_PATH\"" >> "$exports_path"
 	echo -n "$library_path" > "$apt_env_dir"/LIBRARY_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/LIBRARY_PATH.delim
 
 	include_path=$apt_layer/usr/include:$apt_layer/usr/include/x86_64-linux-gnu
-	echo "INCLUDE_PATH=$include_path" | indent
+	log::info "INCLUDE_PATH=$include_path" | indent
 	echo "export INCLUDE_PATH=\"$include_path:\$INCLUDE_PATH\"" >> "$exports_path"
 	echo -n "$include_path" > "$apt_env_dir"/INCLUDE_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/INCLUDE_PATH.delim
 
 	cpath="\$INCLUDE_PATH"
-	echo "CPATH=$cpath" | indent
+	log::info "CPATH=$cpath" | indent
 	echo "export CPATH=\"$cpath\"" >> "$exports_path"
 	cp "$apt_env_dir"/INCLUDE_PATH.prepend "$apt_env_dir"/CPATH.prepend
 	echo -n ":" > "$apt_env_dir"/CPATH.delim
 
 	cpppath="\$INCLUDE_PATH"
-	echo "CPPPATH=$cpppath" | indent
+	log::info "CPPPATH=$cpppath" | indent
 	echo "export CPPPATH=\"$cpppath\"" >> "$exports_path"
 	cp "$apt_env_dir"/INCLUDE_PATH.prepend "$apt_env_dir"/CPPPATH.prepend
 	echo -n ":" > "$apt_env_dir"/CPPPATH.delim
 
 	pkg_config_path=$apt_layer/usr/lib/x86_64-linux-gnu/pkgconfig:$apt_layer/usr/lib/i386-linux-gnu/pkgconfig:$apt_layer/usr/lib/pkgconfig
-	echo "PKG_CONFIG_PATH=$pkg_config_path" | indent
+	log::info "PKG_CONFIG_PATH=$pkg_config_path" | indent
 	echo "export PKG_CONFIG_PATH=\"$pkg_config_path:\$PKG_CONFIG_PATH\"" >> "$exports_path"
 	echo -n "$pkg_config_path" > "$apt_env_dir"/PKG_CONFIG_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/PKG_CONFIG_PATH.delim
