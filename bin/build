@@ -74,7 +74,7 @@ else
 
 	log::info "=> Updating apt caches"
 	# Ignore stderr from apt-get update containing: rm: cannot remove '/var/cache/apt/archives/partial/*.deb': Permission denied
-	apt-get "${APT_OPTIONS[@]}" update 2> >(grep -v "rm: cannot remove") | indent
+	apt-get "${APT_OPTIONS[@]}" update 2> >(grep -v "rm: cannot remove")
 
 	while read -r line; do
 	  if [[ $line != "#"* ]] && [[ $line != ":repo:"* ]]; then
@@ -84,10 +84,10 @@ else
 		  PACKAGE_FILE=$APT_CACHE_DIR/archives/$PACKAGE_NAME.deb
 
 		  log::info "=> Fetching $PACKAGE"
-		  curl --silent --show-error --fail -L -z "$PACKAGE_FILE" -o "$PACKAGE_FILE" "$PACKAGE" 2>&1 | indent
+		  curl --silent --show-error --fail -L -z "$PACKAGE_FILE" -o "$PACKAGE_FILE" "$PACKAGE" 2>&1
 		else
 		  log::info "=> Fetching .debs for $PACKAGE"
-		  apt-get "${APT_OPTIONS[@]}" -y "${APT_FORCE_YES[@]}" -d install --reinstall "$PACKAGE" | indent
+		  apt-get "${APT_OPTIONS[@]}" -y "${APT_FORCE_YES[@]}" -d install --reinstall "$PACKAGE"
 		fi
 	  fi
 	done < Aptfile
@@ -96,7 +96,7 @@ else
 	for DEB in "$APT_CACHE_DIR"/archives/*.deb
 	do
 		[[ -e "$DEB" ]] || break
-		basename "$DEB" | indent
+		basename "$DEB"
 		dpkg -x "$DEB" "$apt_layer"/
 	done
 
@@ -108,43 +108,43 @@ else
 	mkdir -p "$apt_env_dir"
 
 	path="$apt_layer/usr/bin"
-	log::info "PATH=$path" | indent
+	log::info "PATH=$path"
 	echo "export PATH=\"$path:\$PATH\"" >> "$exports_path"
 	echo -n "$path:$PATH" > "$apt_env_dir"/PATH.prepend
 	echo -n ":" > "$apt_env_dir"/PATH.delim
 
 	ld_library_path=$apt_layer/lib/x86_64-linux-gnu:$apt_layer/lib/i386-linux-gnu:$apt_layer/lib:$apt_layer/usr/lib/x86_64-linux-gnu:$apt_layer/usr/lib/i386-linux-gnu:$apt_layer/usr/lib
-	log::info "LD_LIBRARY_PATH=$ld_library_path" | indent
+	log::info "LD_LIBRARY_PATH=$ld_library_path"
 	echo "export LD_LIBRARY_PATH=\"$ld_library_path:\$LD_LIBRARY_PATH\"" >> "$exports_path"
 	echo -n "$ld_library_path" > "$apt_env_dir"/LD_LIBRARY_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/LD_LIBRARY_PATH.delim
 
 	library_path=$ld_library_path
-	log::info "LIBRARY_PATH=$library_path" | indent
+	log::info "LIBRARY_PATH=$library_path"
 	echo "export LIBRARY_PATH=\"$library_path:\$LIBRARY_PATH\"" >> "$exports_path"
 	echo -n "$library_path" > "$apt_env_dir"/LIBRARY_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/LIBRARY_PATH.delim
 
 	include_path=$apt_layer/usr/include:$apt_layer/usr/include/x86_64-linux-gnu
-	log::info "INCLUDE_PATH=$include_path" | indent
+	log::info "INCLUDE_PATH=$include_path"
 	echo "export INCLUDE_PATH=\"$include_path:\$INCLUDE_PATH\"" >> "$exports_path"
 	echo -n "$include_path" > "$apt_env_dir"/INCLUDE_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/INCLUDE_PATH.delim
 
 	cpath="\$INCLUDE_PATH"
-	log::info "CPATH=$cpath" | indent
+	log::info "CPATH=$cpath"
 	echo "export CPATH=\"$cpath\"" >> "$exports_path"
 	cp "$apt_env_dir"/INCLUDE_PATH.prepend "$apt_env_dir"/CPATH.prepend
 	echo -n ":" > "$apt_env_dir"/CPATH.delim
 
 	cpppath="\$INCLUDE_PATH"
-	log::info "CPPPATH=$cpppath" | indent
+	log::info "CPPPATH=$cpppath"
 	echo "export CPPPATH=\"$cpppath\"" >> "$exports_path"
 	cp "$apt_env_dir"/INCLUDE_PATH.prepend "$apt_env_dir"/CPPPATH.prepend
 	echo -n ":" > "$apt_env_dir"/CPPPATH.delim
 
 	pkg_config_path=$apt_layer/usr/lib/x86_64-linux-gnu/pkgconfig:$apt_layer/usr/lib/i386-linux-gnu/pkgconfig:$apt_layer/usr/lib/pkgconfig
-	log::info "PKG_CONFIG_PATH=$pkg_config_path" | indent
+	log::info "PKG_CONFIG_PATH=$pkg_config_path"
 	echo "export PKG_CONFIG_PATH=\"$pkg_config_path:\$PKG_CONFIG_PATH\"" >> "$exports_path"
 	echo -n "$pkg_config_path" > "$apt_env_dir"/PKG_CONFIG_PATH.prepend
 	echo -n ":" > "$apt_env_dir"/PKG_CONFIG_PATH.delim
@@ -155,4 +155,4 @@ echo "build = true" >> "${apt_layer}".toml
 echo "cache = true" >> "${apt_layer}".toml
 
 end_time=$(date +%s%N)
-log::info "=> Elapsed time: $(( $(( end_time - start_time )) / 1000000 ))ms" | indent
+log::info "=> Elapsed time: $(( $(( end_time - start_time )) / 1000000 ))ms"
