@@ -1,0 +1,46 @@
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout main
+        uses: actions/checkout@main
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.19.1
+        id: go
+
+      - name: Validate tag matches version from buildpack.toml
+        run: |
+          make version-check
+
+      # Make release builds and tars the requisite binaries
+      - name: Make release
+        run: |
+          make release
+
+      - name: Set version as environmental variable
+        run: echo "VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: DigitalOcean Spaces Upload Action
+        timeout-minutes: 5
+        uses: BetaHuhn/do-spaces-action@v2.0.1
+        with:
+          access_key: ${{ secrets.KEY_ID}}
+          secret_key: ${{ secrets.SECRET_ACCESS_KEY }}
+          space_name: ${{ secrets.SPACES_BUCKET }}
+          space_region: ${{ secrets.SPACES_REGION }}
+          source: buildpack-node-${{ env.VERSION }}.tgz
+
+      # create_github_release makes a release using the pushed tag on github
+      - name: Create github Release
+        id: create_github_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: buildpack-apt-${{ env.VERSION }}.tgz
