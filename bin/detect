@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+if [[ -f Aptfile ]]; then
+	echo "Apt" && exit 0
+else
+	echo "No Aptfile found" && exit 100
+fi

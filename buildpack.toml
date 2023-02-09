@@ -1,0 +1,27 @@
+api = "0.4"
+
+[buildpack]
+id = "jonfriesen/apt"
+version = "0.0.1"
+name = "apt Packages Buildpack"
+homepage = "https://github.com/jonfriesen/buildpack-apt"
+description = "Installs apt packages for further builds and runtime"
+keywords = ["apt", "packages", "ubuntu"]
+
+[[buildpack.licenses]]
+type = "MIT"
+
+[[stacks]]
+id = "heroku-18"
+
+[[stacks]]
+id = "heroku-20"
+
+[[stacks]]
+id = "heroku-22"
+
+[[stacks]]
+id = "io.buildpacks.stacks.bionic"
+
+[[stacks]]
+id = "io.buildpacks.stacks.jammy"
