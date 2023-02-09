@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+dev_path=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$dev_path"
+
+# shellcheck source=../bin/util.sh
+. "../bin/util.sh"
+
+cd ..
+
+log::info "=> Running E2E tests"
+
+docker run -v ${PWD}/bin:/buildpack-apt -v ${PWD}/e2e/e2e.sh:/e2e/e2e.sh ubuntu:latest /e2e/e2e.sh

@@ -1,67 +1,58 @@
 #!/usr/bin/env bash
 
 # fail fast
-#set -eo pipefail
-
-set -eu
+set -euo pipefail
 
 start_time=$(date +%s%N)
 
 # debug
 if [[ -v BUILDPACK_APT_DEBUG ]]; then
-  set -x
+	set -x
 fi
 
 # shellcheck disable=SC1090,SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/util.sh"
 
 layers_dir="$1"
-env_dir="$2/env"
-
-if compgen -G "${env_dir}/*" > /dev/null; then
-  for var in "${env_dir}"/*; do
-    declare "$(basename "${var}")=$(<"${var}")"
-  done
-fi
 
 apt_layer=$layers_dir/apt
 mkdir -p "$apt_layer"
 
 # Store which STACK we are running on in the cache to bust the cache if it changes
-if [ -f "$apt_layer"/STACK ]; then
-  CACHED_STACK=$(cat "$apt_layer/STACK")
+if [[ -f "$apt_layer"/STACK ]]; then
+	CACHED_STACK=$(cat "$apt_layer/STACK")
 else
-  CACHED_STACK=$CNB_STACK_ID
+	CACHED_STACK=$CNB_STACK_ID
 fi
 
 # Ensure we store the STACK in the cache for next time.
-echo "$CNB_STACK_ID" > "$apt_layer/STACK"
+echo -n "$CNB_STACK_ID" >"$apt_layer/STACK"
 
 APT_CACHE_DIR="$apt_layer/cache"
 APT_STATE_DIR="$apt_layer/state"
-APT_SOURCELIST_DIR="$apt_layer/sources"   # place custom sources.list here
+APT_SOURCELIST_DIR="$apt_layer/sources" # place custom sources.list here
 APT_SOURCES="$APT_SOURCELIST_DIR/sources.list"
 APT_VERSION=$(apt-get -v | awk 'NR == 1{ print $2 }')
 
 case "$APT_VERSION" in
-	0* | 1.0*) APT_FORCE_YES=(--force-yes);;
-	*)         APT_FORCE_YES=(--allow-downgrades --allow-remove-essential --allow-change-held-packages);;
+	0* | 1.0*) APT_FORCE_YES=(--force-yes) ;;
+	*) APT_FORCE_YES=(--allow-downgrades --allow-remove-essential --allow-change-held-packages) ;;
 esac
 
-if [ -f "$apt_layer"/Aptfile ] && cmp -s Aptfile "$apt_layer"/Aptfile && [[ $CACHED_STACK == "$CNB_STACK_ID" ]] ; then
+if [[ -f "$apt_layer"/Aptfile && $CACHED_STACK == "$CNB_STACK_ID" ]] && cmp -s Aptfile "$apt_layer"/Aptfile; then
 	log::info "=> Aptfile and stack look the same, reusing cache"
 else
 	# Aptfile changed or does not exist or STACK changed
-	log::info "=> Detected Aptfile changes, flushing cache"
+	log::info "=> Installing packages in Aptfile"
 	rm -rf "$APT_CACHE_DIR"
 	mkdir -p "$APT_CACHE_DIR/archives/partial"
 	mkdir -p "$APT_STATE_DIR/lists/partial"
 	mkdir -p "$APT_SOURCELIST_DIR"
 	cp -f Aptfile "$apt_layer"/Aptfile
-	cat "/etc/apt/sources.list" > "$APT_SOURCES"
+	cat "/etc/apt/sources.list" >"$APT_SOURCES"
 	if grep -q -e "^:repo:" Aptfile; then
-	log::info "=> Adding custom repositories"
-	grep -s -e "^:repo:" Aptfile | sed 's/^:repo:\(.*\)\s*$/\1/g' >> "$APT_SOURCES"
+		log::info "=> Adding custom repositories"
+		grep -s -e "^:repo:" Aptfile | sed 's/^:repo:\(.*\)\s*$/\1/g' >>"$APT_SOURCES"
 	fi
 
 	APT_OPTIONS=(
@@ -77,30 +68,28 @@ else
 	apt-get "${APT_OPTIONS[@]}" update 2> >(grep -v "rm: cannot remove")
 
 	while read -r line; do
-	  if [[ $line != "#"* ]] && [[ $line != ":repo:"* ]]; then
-		PACKAGE=$line
-		if [[ $PACKAGE == *deb ]]; then
-		  PACKAGE_NAME=$(basename "$PACKAGE" .deb)
-		  PACKAGE_FILE=$APT_CACHE_DIR/archives/$PACKAGE_NAME.deb
+		if [[ $line != "#"* ]] && [[ $line != ":repo:"* ]]; then
+			PACKAGE=$line
+			if [[ $PACKAGE == *deb ]]; then
+				PACKAGE_NAME=$(basename "$PACKAGE" .deb)
+				PACKAGE_FILE=$APT_CACHE_DIR/archives/$PACKAGE_NAME.deb
 
-		  log::info "=> Fetching $PACKAGE"
-		  curl --silent --show-error --fail -L -z "$PACKAGE_FILE" -o "$PACKAGE_FILE" "$PACKAGE" 2>&1
-		else
-		  log::info "=> Fetching .debs for $PACKAGE"
-		  apt-get "${APT_OPTIONS[@]}" -y "${APT_FORCE_YES[@]}" -d install --reinstall "$PACKAGE"
+				log::info "=> Fetching $PACKAGE"
+				curl --silent --show-error --fail -L -z "$PACKAGE_FILE" -o "$PACKAGE_FILE" "$PACKAGE" 2>&1
+			else
+				log::info "=> Fetching dependencies for $PACKAGE"
+				apt-get "${APT_OPTIONS[@]}" -y "${APT_FORCE_YES[@]}" -d install --reinstall "$PACKAGE"
+			fi
 		fi
-	  fi
-	done < Aptfile
+	done <Aptfile
 
 	log::info "=> Installing apt packages with dpkg"
-	for DEB in "$APT_CACHE_DIR"/archives/*.deb
-	do
-		[[ -e "$DEB" ]] || break
+	for DEB in "$APT_CACHE_DIR"/archives/*.deb; do
+		[[ -e $DEB ]] || continue
 		basename "$DEB"
 		dpkg -x "$DEB" "$apt_layer"/
 	done
 
-	log::info "=> Writing profile script and environment variables"
 	exports_path=$apt_layer/.profile.d/000_apt.sh
 	mkdir -p "$apt_layer"/.profile.d
 	touch "$exports_path"
@@ -108,51 +97,51 @@ else
 	mkdir -p "$apt_env_dir"
 
 	path="$apt_layer/usr/bin"
-	log::info "PATH=$path"
-	echo "export PATH=\"$path:\$PATH\"" >> "$exports_path"
-	echo -n "$path:$PATH" > "$apt_env_dir"/PATH.prepend
-	echo -n ":" > "$apt_env_dir"/PATH.delim
+	echo "export PATH=\"$path:\$PATH\"" >>"$exports_path"
+	echo -n "$path:$PATH" >"$apt_env_dir"/PATH.prepend
+	echo -n ":" >"$apt_env_dir"/PATH.delim
 
 	ld_library_path=$apt_layer/lib/x86_64-linux-gnu:$apt_layer/lib/i386-linux-gnu:$apt_layer/lib:$apt_layer/usr/lib/x86_64-linux-gnu:$apt_layer/usr/lib/i386-linux-gnu:$apt_layer/usr/lib
 	log::info "LD_LIBRARY_PATH=$ld_library_path"
-	echo "export LD_LIBRARY_PATH=\"$ld_library_path:\$LD_LIBRARY_PATH\"" >> "$exports_path"
-	echo -n "$ld_library_path" > "$apt_env_dir"/LD_LIBRARY_PATH.prepend
-	echo -n ":" > "$apt_env_dir"/LD_LIBRARY_PATH.delim
+	echo "export LD_LIBRARY_PATH=\"$ld_library_path:\$LD_LIBRARY_PATH\"" >>"$exports_path"
+	echo -n "$ld_library_path" >"$apt_env_dir"/LD_LIBRARY_PATH.prepend
+	echo -n ":" >"$apt_env_dir"/LD_LIBRARY_PATH.delim
 
 	library_path=$ld_library_path
 	log::info "LIBRARY_PATH=$library_path"
-	echo "export LIBRARY_PATH=\"$library_path:\$LIBRARY_PATH\"" >> "$exports_path"
-	echo -n "$library_path" > "$apt_env_dir"/LIBRARY_PATH.prepend
-	echo -n ":" > "$apt_env_dir"/LIBRARY_PATH.delim
+	echo "export LIBRARY_PATH=\"$library_path:\$LIBRARY_PATH\"" >>"$exports_path"
+	echo -n "$library_path" >"$apt_env_dir"/LIBRARY_PATH.prepend
+	echo -n ":" >"$apt_env_dir"/LIBRARY_PATH.delim
 
 	include_path=$apt_layer/usr/include:$apt_layer/usr/include/x86_64-linux-gnu
 	log::info "INCLUDE_PATH=$include_path"
-	echo "export INCLUDE_PATH=\"$include_path:\$INCLUDE_PATH\"" >> "$exports_path"
-	echo -n "$include_path" > "$apt_env_dir"/INCLUDE_PATH.prepend
-	echo -n ":" > "$apt_env_dir"/INCLUDE_PATH.delim
+	echo "export INCLUDE_PATH=\"$include_path:\$INCLUDE_PATH\"" >>"$exports_path"
+	echo -n "$include_path" >"$apt_env_dir"/INCLUDE_PATH.prepend
+	echo -n ":" >"$apt_env_dir"/INCLUDE_PATH.delim
 
-	cpath="\$INCLUDE_PATH"
+	# shellcheck disable=SC2016
+	cpath='$INCLUDE_PATH'
 	log::info "CPATH=$cpath"
-	echo "export CPATH=\"$cpath\"" >> "$exports_path"
+	echo "export CPATH=\"$cpath\"" >>"$exports_path"
 	cp "$apt_env_dir"/INCLUDE_PATH.prepend "$apt_env_dir"/CPATH.prepend
-	echo -n ":" > "$apt_env_dir"/CPATH.delim
+	echo -n ":" >"$apt_env_dir"/CPATH.delim
 
-	cpppath="\$INCLUDE_PATH"
-	log::info "CPPPATH=$cpppath"
-	echo "export CPPPATH=\"$cpppath\"" >> "$exports_path"
+	# shellcheck disable=SC2016
+	cpppath='$INCLUDE_PATH'
+	echo "export CPPPATH=\"$cpppath\"" >>"$exports_path"
 	cp "$apt_env_dir"/INCLUDE_PATH.prepend "$apt_env_dir"/CPPPATH.prepend
-	echo -n ":" > "$apt_env_dir"/CPPPATH.delim
+	echo -n ":" >"$apt_env_dir"/CPPPATH.delim
 
 	pkg_config_path=$apt_layer/usr/lib/x86_64-linux-gnu/pkgconfig:$apt_layer/usr/lib/i386-linux-gnu/pkgconfig:$apt_layer/usr/lib/pkgconfig
 	log::info "PKG_CONFIG_PATH=$pkg_config_path"
-	echo "export PKG_CONFIG_PATH=\"$pkg_config_path:\$PKG_CONFIG_PATH\"" >> "$exports_path"
-	echo -n "$pkg_config_path" > "$apt_env_dir"/PKG_CONFIG_PATH.prepend
-	echo -n ":" > "$apt_env_dir"/PKG_CONFIG_PATH.delim
+	echo "export PKG_CONFIG_PATH=\"$pkg_config_path:\$PKG_CONFIG_PATH\"" >>"$exports_path"
+	echo -n "$pkg_config_path" >"$apt_env_dir"/PKG_CONFIG_PATH.prepend
+	echo -n ":" >"$apt_env_dir"/PKG_CONFIG_PATH.delim
 fi
 
-echo "launch = true" > "${apt_layer}".toml
-echo "build = true" >> "${apt_layer}".toml
-echo "cache = true" >> "${apt_layer}".toml
+echo "launch = true" >"${apt_layer}".toml
+echo "build = true" >>"${apt_layer}".toml
+echo "cache = true" >>"${apt_layer}".toml
 
 end_time=$(date +%s%N)
-log::info "=> Elapsed time: $(( $(( end_time - start_time )) / 1000000 ))ms"
+log::info "=> Installed $(wc -l Aptfile | cut -d' ' -f1) packages in $(($((end_time - start_time)) / 1000000000))s"
